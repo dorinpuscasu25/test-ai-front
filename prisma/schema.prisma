@@ -1,0 +1,289 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("USER_INFO_DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  clerkId        String   @unique
+  container      String?  @unique
+  name           String?
+  profilePicture String?
+  credits        Int      @default(5)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  isVerified Boolean @default(false)
+
+  interviews      Interview[]
+  feedback        Feedback[]
+  userPreferences UserPreference?
+
+  @@index([email])
+  @@index([clerkId])
+  @@map("users")
+}
+
+model UserPreference {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Interface preferences
+  darkMode Boolean @default(true)
+
+  // Feedback preferences
+  detailedFeedback Boolean @default(true)
+  videoAnalysis    Boolean @default(true)
+  voiceAnalysis    Boolean @default(true)
+
+  // Language preference
+  languagePreference String @default("english")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_preferences")
+}
+
+// Interview-related models based on form fields
+model JobType {
+  id          String  @id @default(cuid())
+  value       String  @unique // e.g., "frontend", "backend"
+  label       String // e.g., "Frontend Developer"
+  description String?
+  icon        String?
+
+  // Relations
+  interviews Interview[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([value])
+  @@map("job_types")
+}
+
+model ProgrammingLanguage {
+  id         String              @id @default(cuid())
+  value      String              @unique
+  label      String
+  interviews InterviewLanguage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([value])
+  @@map("programming_languages")
+}
+
+model InterviewLanguage {
+  id          String              @id @default(cuid())
+  interviewId String
+  interview   Interview           @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  languageId  String
+  language    ProgrammingLanguage @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@unique([interviewId, languageId])
+  @@index([interviewId])
+  @@index([languageId])
+  @@map("interview_languages")
+}
+
+model Country {
+  id    String @id @default(cuid())
+  value String @unique // e.g., "us", "uk"
+  label String // e.g., "United States", "United Kingdom"
+
+  // Relations
+  interviews Interview[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([value])
+  @@map("countries")
+}
+
+model Interview {
+  id String @id @default(cuid())
+
+  // Interview settings from form
+  level                String
+  jobType              String
+  programmingLanguages String[]
+  interviewLanguage    String // e.g., "english", "spanish"
+  country              String
+  interviewType        String // e.g., "technical", "behavioral"
+  stage                String // e.g., "screening", "final"
+  jobDescription       String?
+  cvUrl                String? // URL to uploaded CV
+
+  // Interview details
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+  mode   String
+
+  startedAt DateTime?
+  endedAt   DateTime?
+
+  // Progress
+  duration           Int? // in seconds
+  totalQuestions     Int?
+  completedQuestions Int?
+
+  // Media storage
+  recordingUrl String?
+
+  // Relations
+  questions Question[]
+  responses Response[]
+  feedback  Feedback?
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  JobType           JobType?            @relation(fields: [jobTypeId], references: [id])
+  jobTypeId         String?
+  InterviewLanguage InterviewLanguage[]
+  Country           Country?            @relation(fields: [countryId], references: [id])
+  countryId         String?
+
+  @@map("interviews")
+}
+
+model Question {
+  id         String @id @default(cuid())
+  content    String @db.Text
+  type       String
+  orderIndex Int // Order within the interview
+
+  // For technical questions
+  difficulty String?
+
+  // Relations
+  interviewId String
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  response    Response?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("questions")
+}
+
+model Response {
+  id String @id @default(cuid())
+
+  // Response content
+  textResponse String? @db.Text
+  audioUrl     String?
+
+  // Related entities
+  interviewId String
+  interview   Interview @relation(fields: [interviewId], references: [id])
+  questionId  String    @unique
+  question    Question  @relation(fields: [questionId], references: [id])
+
+  // Analysis results (can be stored as JSON or as relations to more detailed tables)
+  contentAnalysis Json?
+  voiceAnalysis   Json?
+  videoAnalysis   Json?
+
+  responseScore Float? // 0-100 score
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([interviewId])
+  @@index([questionId])
+  @@map("responses")
+}
+
+model Feedback {
+  id String @id @default(cuid())
+
+  // Overall feedback
+  overallScore   Float // 0-100 score
+  strengths      String[]
+  areasToImprove String[]
+  summary        String   @db.Text
+
+  contentScore       Float?
+  communicationScore Float?
+  behaviorScore      Float?
+
+  confidenceScore Float?
+  clarityScore    Float?
+  relevanceScore  Float?
+
+  interviewId String    @unique
+  interview   Interview @relation(fields: [interviewId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("feedbacks")
+}
+
+// Enums
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum ExperienceLevel {
+  JUNIOR
+  MIDDLE
+  SENIOR
+  LEAD
+  MANAGER
+}
+
+enum InterviewMode {
+  TEXT_WITH_VOICE
+  VOICE_CALL
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+  FAILED
+}
+
+enum InterviewType {
+  TECHNICAL
+  BEHAVIORAL
+  MIXED
+}
+
+enum InterviewStage {
+  SCREENING
+  TECHNICAL
+  MANAGER
+  FINAL
+  ONSITE
+}
+
+enum QuestionType {
+  TECHNICAL
+  BEHAVIORAL
+  SITUATIONAL
+  ICEBREAKER
+  FOLLOW_UP
+}
+
+enum QuestionDifficulty {
+  EASY
+  MEDIUM
+  HARD
+  EXPERT
+}
