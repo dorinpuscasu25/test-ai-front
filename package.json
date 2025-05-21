@@ -11,9 +11,6 @@
     "prisma:migrate": "prisma migrate dev --name \"$(date +%Y%m%d_%H%M%S)\" --schema=./prisma/schema.prisma"
   },
   "dependencies": {
-    "@azure/msal-node": "^3.5.3",
-    "@azure/storage-blob": "^12.27.0",
-    "@clerk/nextjs": "^6.19.1",
     "@hookform/resolvers": "^3.9.0",
     "@next/swc-wasm-nodejs": "13.5.1",
     "@prisma/client": "^6.7.0",
